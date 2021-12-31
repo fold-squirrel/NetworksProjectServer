@@ -61,7 +61,6 @@ namespace HTTPServer
                         Console.WriteLine("Client: {0} ended the connection", clientSock.RemoteEndPoint);
                         break;
                     }
-                    Console.WriteLine("Received: {0} from Client: {1}", Encoding.ASCII.GetString(data, 0, receivedLength), clientSock.RemoteEndPoint);
 
                     //clientSock.Send(data, 0, receivedLength, SocketFlags.None);
 
@@ -144,7 +143,7 @@ namespace HTTPServer
                     if (r == null)
                     {
                         pathToFiles = Path.Combine(Configuration.RootPath, Configuration.InternalErrorDefaultPageName);
-                        content = File.ReadAllText(Configuration.RootPath + "\\InternalError.html");
+                        content = File.ReadAllText(pathToFiles);
                         r = new Response(StatusCode.InternalServerError, "text/html; charset=UTF-8", content, pathToFiles);
                     }
                 }
@@ -152,7 +151,7 @@ namespace HTTPServer
             catch (Exception ex)
             {
                 pathToFiles = Path.Combine(Configuration.RootPath, Configuration.InternalErrorDefaultPageName);
-                content = File.ReadAllText(Configuration.RootPath + "\\InternalError.html");
+                content = File.ReadAllText(pathToFiles);
                 r = new Response(StatusCode.InternalServerError, "text/html; charset=UTF-8", content, pathToFiles);
                 Logger.LogException(ex);
 
