@@ -1,12 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using System.Threading;
-using System.IO;
-using System.Web;
 
 namespace HTTPServer
 {
@@ -20,7 +18,7 @@ namespace HTTPServer
             this.serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             IPEndPoint hostEndPoint = new IPEndPoint(IPAddress.Any, portNumber);
             serverSocket.Bind(hostEndPoint);
-            
+
             //TODO: call this.LoadRedirectionRules passing redirectionMatrixPath to it
             //TODO: initialize this.serverSocket
         }
@@ -28,22 +26,18 @@ namespace HTTPServer
         public void StartServer()
         {
             serverSocket.Listen(100);
-            // TODO: Listen to connections, with large backlog.
 
-            // TODO: Accept connections in while loop and start a thread for each connection on function "Handle Connection"
             while (true)
             {
                 Socket clientSocket = this.serverSocket.Accept();
                 Console.WriteLine("Connected...");
                 Console.WriteLine("New client accepted: {0}", clientSocket.RemoteEndPoint);
-                Thread newthread = new Thread(new ParameterizedThreadStart (HandleConnection));
-                newthread.Start(clientSocket);
-                //TODO: accept connections and start thread for each accepted connection.
-
+                //HandleConnection(clientSocket);
+                ThreadPool.QueueUserWorkItem(new WaitCallback(HandleConnection), clientSocket);
             }
-    }
+        }
 
-    public void HandleConnection(object obj)
+        public void HandleConnection(object obj)
         {
             // TODO: Create client socket 
             // set client socket ReceiveTimeout = 0 to indicate an infinite time-out period
@@ -51,11 +45,7 @@ namespace HTTPServer
             // TODO: receive requests in while true until remote client closes the socket.
             Socket clientSock = (Socket)obj;
             clientSock.ReceiveTimeout = 0;
-            ///////////////////////////////////////////////////////////////
-            string welcome = "Welcome to my test server";
-            byte[] data = Encoding.ASCII.GetBytes(welcome);
-            //clientSock.Send(data);
-            //////////////////////////////////////////////////////////////
+            byte[] data = new byte[1024];
             int receivedLength;
 
             while (true)
@@ -71,14 +61,13 @@ namespace HTTPServer
                         Console.WriteLine("Client: {0} ended the connection", clientSock.RemoteEndPoint);
                         break;
                     }
-                    Console.WriteLine("Received: {0} from Client: {1}" ,Encoding.ASCII.GetString(data, 0, receivedLength), clientSock.RemoteEndPoint);
+                    Console.WriteLine("Received: {0} from Client: {1}", Encoding.ASCII.GetString(data, 0, receivedLength), clientSock.RemoteEndPoint);
 
                     //clientSock.Send(data, 0, receivedLength, SocketFlags.None);
 
                     // TODO: Receive request
 
                     // TODO: break the while loop if receivedLen==0
-                    message = message.Replace("\\r\\n", "\r\n");
                     Request req = new Request(message);
                     // TODO: Create a Request object using received request string
                     Response response = HandleRequest(req);
@@ -101,48 +90,49 @@ namespace HTTPServer
         {
             string content;
             string pathToFiles;
-            Response r =null;
+            Response r = null;
             try
             {
                 //TODO: check for bad request 
                 if (!request.ParseRequest())
                 {
-                    pathToFiles = Configuration.RootPath + "\\BadRequest.html";
-                    content = File.ReadAllText(Configuration.RootPath + "\\BadRequest.html");
+                    pathToFiles = Path.Combine(Configuration.RootPath, Configuration.BadRequestDefaultPageName);
+                    content = LoadDefaultPage(pathToFiles);
                     r = new Response(StatusCode.BadRequest, "text/html; charset=UTF-8", content, pathToFiles);
+                    return r;
                 }
                 else
                 {
                     //TODO: map the relativeURI in request to get the physical path of the resource.
                     string filename = request.relativeURI;
-                    string[] sub = filename.Split(':');
-                    string[] sub2 = sub[2].Split('/');
-                    sub2[1]=sub2[1].Trim();
+                    string[] sub2 = filename.Split(new char[] { '/' });
+                    sub2[1] = sub2[1].Trim();
                     filename = sub2[1];
-                    pathToFiles = Configuration.RootPath+"\\"+filename;
-                    //////////////////////////////////////////////////
-                    Console.WriteLine(pathToFiles);
-                    /////////////////////////////////////////////////
+                    pathToFiles = Path.Combine(Configuration.RootPath, filename);
                     //TODO: check for redirect
+                    if (filename.Equals(""))
+                    {
+                        content = LoadDefaultPage("default.html");
+                        r = new Response(StatusCode.OK, "text/html; charset=UTF-8", content, String.Empty);
+                        return r;
+                    }
                     if (GetRedirectionPagePathIFExist(filename) != String.Empty)
                     {
                         filename = GetRedirectionPagePathIFExist(filename);
-                        pathToFiles = Configuration.RootPath + "\\" + filename;
+                        pathToFiles = Path.Combine(Configuration.RootPath, filename);
                         content = File.ReadAllText(pathToFiles);
                         r = new Response(StatusCode.Redirect, "text/html; charset=UTF-8", content, pathToFiles);
                     }
                     //bool test=File.Exists(pathToFiles);
                     if (!File.Exists(pathToFiles))
                     {
-                        pathToFiles = Configuration.RootPath + "\\NotFound.html";
-                        content = File.ReadAllText(Configuration.RootPath+"\\NotFound.html");
+                        pathToFiles = Path.Combine(Configuration.RootPath, Configuration.NotFoundDefaultPageName);
+                        content = File.ReadAllText(pathToFiles);
                         r = new Response(StatusCode.NotFound, "text/html; charset=UTF-8", content, pathToFiles);
-                        IOException ex = new IOException();
-                        Logger.LogException(ex);
                     }
                     else
                     {
-                        pathToFiles = Configuration.RootPath + "\\" + filename;
+                        pathToFiles = Path.Combine(Configuration.RootPath, filename);
                         content = File.ReadAllText(pathToFiles);
                         r = new Response(StatusCode.OK, "text/html; charset=UTF-8", content, pathToFiles);
                     }
@@ -153,15 +143,17 @@ namespace HTTPServer
                     // Create OK response
                     if (r == null)
                     {
-                        pathToFiles = Configuration.RootPath + "\\InternalError.html";
+                        pathToFiles = Path.Combine(Configuration.RootPath, Configuration.InternalErrorDefaultPageName);
                         content = File.ReadAllText(Configuration.RootPath + "\\InternalError.html");
-                        r = new Response(StatusCode.NotFound, "text/html; charset=UTF-8", content, pathToFiles);
+                        r = new Response(StatusCode.InternalServerError, "text/html; charset=UTF-8", content, pathToFiles);
                     }
                 }
-                
             }
             catch (Exception ex)
             {
+                pathToFiles = Path.Combine(Configuration.RootPath, Configuration.InternalErrorDefaultPageName);
+                content = File.ReadAllText(Configuration.RootPath + "\\InternalError.html");
+                r = new Response(StatusCode.InternalServerError, "text/html; charset=UTF-8", content, pathToFiles);
                 Logger.LogException(ex);
 
                 // TODO: log exception using Logger class
@@ -173,7 +165,7 @@ namespace HTTPServer
         private string GetRedirectionPagePathIFExist(string relativePath)
         {
             // using Configuration.RedirectionRules return the redirected page path if exists else returns empty
-            foreach(var redirect in Configuration.RedirectionRules)
+            foreach (var redirect in Configuration.RedirectionRules)
             {
                 if (relativePath == redirect.Key)
                 {
@@ -188,7 +180,7 @@ namespace HTTPServer
             string filePath = Path.Combine(Configuration.RootPath, defaultPageName);
             // TODO: check if filepath not exist log exception using Logger class and return empty string
             String content;
-            if (!File.Exists(defaultPageName))
+            if (!File.Exists(filePath))
             {
                 FileNotFoundException ex = new FileNotFoundException();
                 Logger.LogException(ex);
@@ -196,7 +188,7 @@ namespace HTTPServer
             }
             else
             {
-                content = File.ReadAllText(defaultPageName);
+                content = File.ReadAllText(filePath);
             }
             // else read file and return its content
             return content;
@@ -206,11 +198,14 @@ namespace HTTPServer
         {
             try
             {
-                String rules =File.ReadAllText("redirectionRules.txt");
-                string[] sub = rules.Split(',');
-                sub[1] = sub[1].Trim();
+                String[] rules = File.ReadAllLines("redirectionRules.txt");
                 Configuration.RedirectionRules = new Dictionary<string, string>();
-                Configuration.RedirectionRules.Add(sub[0],sub[1]);
+                foreach (String rule in rules)
+                {
+                    string[] sub = rule.Split(',');
+                    sub[1] = sub[1].Trim();
+                    Configuration.RedirectionRules.Add(sub[0], sub[1]);
+                }
                 // TODO: using the filepath paramter read the redirection rules from file 
                 // then fill Configuration.RedirectionRules dictionary 
             }

@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.IO;
+﻿using System.IO;
 
 namespace HTTPServer
 {
@@ -31,6 +27,6 @@ namespace HTTPServer
             // example: "aboutus.html,aboutus2.html"
             // means that when making request to aboustus.html,, it redirects me to aboutus2
         }
-         
+
     }
 }

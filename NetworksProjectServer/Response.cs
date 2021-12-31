@@ -1,8 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.IO;
 
 namespace HTTPServer
 {
@@ -34,7 +31,8 @@ namespace HTTPServer
 
             // TODO: Add headlines (Content-Type, Content-Length,Date, [location if there is redirection])
 
-            headerLines.Add(GetStatusLine(code));
+            this.code = code;
+            headerLines.Add(GetStatusLine());
             if (code == StatusCode.Redirect)
             {
                 headerLines.Add("Location: " + redirectoinPath);
@@ -53,10 +51,10 @@ namespace HTTPServer
             {
                 responseString += headerLines[i] + "\r\n";
             }
-            responseString += headerLines[headerLines.Count -1];
+            responseString += headerLines[headerLines.Count - 1];
         }
 
-        private string GetStatusLine(StatusCode code)
+        private string GetStatusLine()
         {
             // TODO: Create the response status line and return it
             string statusLine = string.Empty;
