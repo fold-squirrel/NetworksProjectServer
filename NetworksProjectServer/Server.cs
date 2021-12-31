@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -117,10 +117,10 @@ namespace HTTPServer
                     }
                     if (GetRedirectionPagePathIFExist(filename) != String.Empty)
                     {
-                        filename = GetRedirectionPagePathIFExist(filename);
                         pathToFiles = Path.Combine(Configuration.RootPath, filename);
+                        filename = GetRedirectionPagePathIFExist(filename);
                         content = File.ReadAllText(pathToFiles);
-                        r = new Response(StatusCode.Redirect, "text/html; charset=UTF-8", content, pathToFiles);
+                        r = new Response(StatusCode.Redirect, "text/html; charset=UTF-8", content, filename);
                     }
                     //bool test=File.Exists(pathToFiles);
                     if (!File.Exists(pathToFiles))
